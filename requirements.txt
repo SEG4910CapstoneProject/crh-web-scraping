@@ -1,0 +1,7 @@
+pymongo==4.6.1
+requests==2.31.0
+beautifulsoup4==4.12.2
+regex==2022.7.9
+reactivex==4.0.4
+multiprocess==0.70.16
+coverage==7.4.4
