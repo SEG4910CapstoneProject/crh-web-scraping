@@ -3,7 +3,6 @@
 Python script to retrieve article information via url link using web scraping. 
 
 ## Required Environment variables
-
 ### Database
 | Environment Variable | Description                                                                              |
 |----------------------|------------------------------------------------------------------------------------------|
