@@ -22,3 +22,14 @@ Python script to retrieve article information via url link using web scraping.
 | LOG_FREQUENCY        | The frequency the program will report completed article extraction. For example if 10, then every 10th completion will log to console. (default value = 25)           |
 | WEB_SCRAP_RETRIES    | The maximum allowable retries when web scraping commands fail (default value = 3)                                                                                     |
 | REQUEST_TIMEOUT      | The maximum time in seconds for requests to waiting for a response (default value = 60)                                                                                     |
+
+## Running Unit Tests
+To run unit tests execute the below command. Must be executed on root of the project as working directory
+```commandline
+python -m unittest discover
+```
+## Running the Service
+To run the service execute the below command  Must be executed on root of the project as working directory.
+```commandline
+python ./__main__.py
+```
