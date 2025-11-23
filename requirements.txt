@@ -5,3 +5,4 @@ regex==2022.7.9
 reactivex==4.0.4
 multiprocess==0.70.16
 coverage==7.4.4
+readability-lxml
