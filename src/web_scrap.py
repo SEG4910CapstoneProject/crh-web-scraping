@@ -8,6 +8,8 @@ import html
 import re
 import requests
 import warnings
+from readability import Document
+
 
 from src.config import *
 
@@ -128,7 +130,19 @@ def remove_ads(page_content):
             ad.decompose() # remove ad content
     
     return soup.prettify()
+    
 
+def extract_full_text_from_html(html_content):
+    """
+    Extracts and cleans main text content by targeting the specific article container
+    on The Hacker News (and similar sites).
+    """
+
+    doc = Document(html_content)
+    html = doc.summary()  # returns main article html
+    soup = BeautifulSoup(html, "html.parser")
+    text = soup.get_text(separator="\n", strip=True)
+    return text
 
 def web_scrap(url, logger: Logger, scheduler):
     """
@@ -137,22 +151,9 @@ def web_scrap(url, logger: Logger, scheduler):
     :return: html web scraped page content (or null if web scrap failed)
     """
     return rx.of(url).pipe(
-        # log
-        ops.do_action(lambda url: logger.debug('Web scraping : %s', url)),
-        # get raw page
-        ops.map(lambda url: get_raw_page(url, logger)),
-        ops.do_action(on_error=lambda err: logger.error("Failed to web scrap", exc_info=err)),
-        ops.retry(WEB_SCRAP_RETRIES),
-        ops.do_action(on_error=lambda err: logger.error("Retries Exhausted", exc_info=err)),
-        ops.catch(rx.of(0)),
-        # escape html 
-        ops.map(lambda html_content: html_escape(html_content) if html_content != 0 else None),
-        # logging
-        ops.do_action(lambda result: logIfFailed(result, url, logger)),
-        # Error handling
-        ops.do_action(on_error=lambda err: logger.error("Error occurred - web scrap steam", exc_info=err)),
-        ops.subscribe_on(scheduler=scheduler)
-    )
+        ops.map(lambda url: get_raw_page(url, logger)),  # raw HTML
+        ops.catch(rx.of(None)),
+        ops.subscribe_on(scheduler))
 
 
 def logIfFailed(result, url, logger: Logger):
@@ -173,6 +174,12 @@ def webScrap(article, logger: Logger, mongoService, scheduler):
         ops.flat_map(lambda url: web_scrap(url, logger, scheduler)),
         # Insert into mongo db
         ops.do_action(lambda web_scrap: mongoService.insertWebScrapArticle(article.articleId, web_scrap)),
+        # Extract and save cleaned full text
+        ops.do_action(lambda raw_html: (
+            mongoService.insertCleanFullText(
+                article.articleId, extract_full_text_from_html(raw_html)
+            ) if raw_html else None
+        )),
         # Error handling
         ops.do_action(on_error=lambda err: logger.error("Error occurred while web scraping", exc_info=err)),
         ops.catch(rx.of(0)),

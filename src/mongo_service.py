@@ -1,8 +1,10 @@
 from logging import Logger
 from uuid import UUID
+import uuid
 import reactivex as rx
 from reactivex import operators as ops
 from pymongo import MongoClient
+from bson.binary import Binary
 from src.config import *
 
 
@@ -32,7 +34,12 @@ class MongoService:
         Gets article info for articles that has not been web scraped 
         :return: list of article info that requires web scraping 
         """
-        result = self.collection.find({"web_scrap": {"$exists": False}})
+        query = {
+                "$or": [
+                    {"web_scrap": {"$exists": False}},  # New articles to be fully scraped
+                    {"clean_full_text": {"$exists": False, "$ne": ""}}  # Articles that lack clean text
+                ]}
+        result = self.collection.find(query)
 
         # create array of Article Info 
         articles = []
@@ -61,7 +68,45 @@ class MongoService:
             # Scheduler setup
             ops.subscribe_on(self.scheduler)
         )
+        
 
+    def insertCleanFullText(self, article_id: str, clean_text: str):
+        """Insert the cleaned text into Mongo"""
+        if not clean_text:
+            return
+        try:
+            if isinstance(article_id, uuid.UUID):
+                db_id = Binary(article_id.bytes, subtype=4)
+            else:
+                db_id = Binary(uuid.UUID(article_id).bytes, subtype=4)
+
+            self.collection.update_one(
+                {"_id": db_id},
+                {"$set": {"clean_full_text": clean_text}},
+                upsert=True
+            )
+        except Exception as e:
+            self.logger.error("Failed to insert clean full text", exc_info=e)
+
+
+    def get_articles_without_summary(self, limit=10):
+        """
+        Returns articles where the 'summary' field is missing or null.
+        """
+        return list(self.db.articleContent.find(
+            {"summary": {"$exists": False}},
+            {"clean_full_text": 1, "link": 1}
+        ).limit(limit))
+
+
+    def update_article_summary(self, article_id, summary):
+        """
+        Updates an article with its generated summary.
+        """
+        self.db.articleContent.update_one(
+            {"_id": article_id},
+            {"$set": {"summary": summary}}
+        )
 class ArticleInfo:
     """
     Object containing Article URL and id
